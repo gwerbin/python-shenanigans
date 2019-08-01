@@ -26,8 +26,8 @@ from match import match
 
 
 def assert_raises_many(exc, spec):
-    for func, (args, kwargs) in spec:
-        with pytests.raises(exc):
+    for func, args, kwargs in spec:
+        with pytest.raises(exc):
             func(*args, **kwargs)
 
 
@@ -36,19 +36,20 @@ def test_slicepattern_1():
     f = (
         match()
             [12:52] ('really big, but not too big')
-            [7:]    ('seven or more')
-            [:5]    ('small, like a bird')
             [1]     ('unified')
+            [7:]    ('seven or more')
             [:0]    ('too small and creepy')
+            [:4]    ('small, like a bird')
             [:]     ('i dunno')
     )
 
-    assert f(100) == 'i dunno'
+    assert f(100) == 'seven or more'
     assert f(13) == 'really big, but not too big'
     assert f(9) == 'seven or more'
     assert f(6) == 'i dunno'
-    assert f(5) == 'small, like a bird'  # ranges are **inclusive**
-    assert f(4) == 'small, like a bird'
+    assert f(2) == 'small, like a bird'
+    assert f(4) == 'small, like a bird'  # ranges are **inclusive**
+    assert f(3) == 'small, like a bird'
     assert f(1) == 'unified'
     assert f(0) == 'too small and creepy'  # ranges are **inclusive**
     assert f(-20) == 'too small and creepy'
@@ -75,6 +76,21 @@ def test_retcall():
 
 def test_patcall():
     """ Test the patcall functionality """
+    friendly_isdigit = (
+        match()
+            [lambda x: isinstance(x, str)] ('Its a string :)')
+            [:]                            ('Not a string :(')
+    )
+
+    assert friendly_isdigit('hello') == 'Its a string :)'
+    assert friendly_isdigit(None) == 'Not a string :('
+    assert friendly_isdigit(25) == 'Not a string :('
+
+
+def test_patcall_complicated():
+    """ Test the patcall functionality by implementing an integer calculator """
+    import re
+
     def not_string(x):
         return not isinstance(x, str)
 
@@ -83,12 +99,15 @@ def test_patcall():
             raise exc(message(x) if callable(message) else message)
         return do_raise
 
+    plus = re.compile(r'\s*\+\s*')
+
     intaddexpr = (
         match()
-            [not_string]                   (raises(TypeError, 'Input must be a string'))
-            [str.isdigit]                  (int)
-            [re.compile(r'\s*+\s*').split] (lambda x: sum(map(calc, x)))  # wrap it in a lambda to protect from the parser; TODO: match.recall
-            [:]                            (raises(ValueError, 'Not a valid integer: {}'.format))
+            [not_string]            (raises(TypeError, 'Input must be a string'))
+            [str.isdigit]           (int)
+            [lambda x: x[0] == '-'] (lambda x: -intaddexpr(x[1:]))
+            [plus.search]           (lambda x: sum(map(intaddexpr, plus.split(x))))
+            [:]                     (raises(ValueError, 'Not a valid integer: {}'.format))
     )
 
     assert intaddexpr('-12') == -12
@@ -105,8 +124,22 @@ def test_patcall():
 
 def test_init():
     """ Test the match() constructor itself """
+    with pytest.raises(ValueError):
+        match(-1)
+
     assert_raises_many(TypeError, [
-        (match, (-1,), {}),
         (match, (1, False, False), {}),
-        (match, (1, False,), {retcall=False}),
+        (match, (1, False,), {'retcall': False}),
     ])
+
+
+def test_rangepattern_impl():
+    assert match.check_range_pattern(slice(1,None), 1) is True
+    assert match.check_range_pattern(slice(1,None), 2) is True
+    assert match.check_range_pattern(slice(1,None), -1) is False
+    assert match.check_range_pattern(slice(None,1), 1) is True
+    assert match.check_range_pattern(slice(None,1), 2) is False
+    assert match.check_range_pattern(slice(None,1), -1) is True
+    assert match.check_range_pattern(slice(None,1), 1, include_upper=False) is False
+    with pytest.raises(NotImplementedError):
+        match().pattern_matches([slice(None,None,3)], [None])

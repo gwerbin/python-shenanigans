@@ -22,12 +22,18 @@ class match:
     Limitations:
       * Literal patterns cannot be slice objects or subtypes thereof.
       * Literal patterns cannot be callable objects unless patcall=False.
-      * Results cannot be callable objects unless retcall=False.
+      * If a literal pattern or literal result is a tuple, it must have a trailing comma:
+            match()[(1,2)] will be interpreted as a 2-parameter match on integers 1 and 2
+            match()[(1,2),] will be interpreted as a 1-parameter match on the tuple (1,2)
+      * Literal results cannot be callable objects unless retcall=False.
     """
     def __init__(self, amount: int = 1, *, patcall: bool = True, retcall: bool = True):
         self.amount = amount
+        if not isinstance(amount, int) or amount < 1:
+            raise ValueError('Invalid amount, must be a positive integer')
+
         self.patcall = patcall
-        self.recall = retcall
+        self.retcall = retcall
         self.patterns = []
         self.creating_pattern = None
 
@@ -45,10 +51,14 @@ class match:
 
     def add_pattern(self, pattern, result):
         """ Add a (pattern, result) pair """
+        if len(result) == 1:
+            # Tuples are for user convenience when len > 1,
+            # but when len == 1 assume that we should unwrap
+            result = result[0]
         self.patterns.append((pattern, result))
         self.creating_pattern = None
 
-    def match_apply(values):
+    def match_apply(self, values):
         """ Search for a match and apply the corresponding result """
         if len(values) != self.amount:
             raise TypeError("Invalid amount of values for match")
@@ -57,7 +67,10 @@ class match:
             if self.patcall and callable(pattern):
                 is_match = bool(pattern(*values))
             else:
-                is_match = bool(self.pattern_matches(pattern, values))
+                if not isinstance(pattern, tuple):
+                    # so they don't have to write [:,] or [4,], but they still have to write [(1,2),]
+                    pattern = (pattern,)
+                is_match = self.pattern_matches(pattern, values)
 
             if is_match:
                 if self.retcall and callable(result):
@@ -76,7 +89,27 @@ class match:
             return self.match_apply(values)
 
     @staticmethod
-    def pattern_matches(patterns, values):
+    def check_range_pattern(pattern, value, include_upper=True):
+        """ Test a slice/range pattern """
+        lower = pattern.start
+        upper = pattern.stop
+
+        if lower is not None and upper is not None:
+            if include_upper:
+                return lower <= value < upper
+            else:
+                return lower <= value <= upper
+
+        if lower is None and upper is not None:
+            if include_upper:
+                return value <= upper
+            else:
+                return value < upper
+
+        if lower is not None and upper is None:
+            return value >= lower
+
+    def pattern_matches(self, patterns, values):
         """ Test if a value matches a (non-callable) pattern """
         for pattern, value in zip(patterns, values):
             if pattern == slice(None, None, None):
@@ -84,20 +117,16 @@ class match:
                 continue
 
             if isinstance(pattern, slice):
+                if pattern.step is not None:
+                    # ???
+                    raise NotImplementedError('A range pattern with a step value has no meaning (yet)')
+
                 # this is a range pattern, [a:b]
-                lower = pattern.start
-                upper = pattern.stop
-
-                if lower is None and value > upper:
-                    return False
-
-                elif upper is None and value < lower:
-                    return False
-
-                if not lower <= value <= upper:
+                if not self.check_range_pattern(pattern, value):
                     return False
 
             elif pattern != value:
                 return False
 
+        # fell through a catch-all pattern at the end
         return True
