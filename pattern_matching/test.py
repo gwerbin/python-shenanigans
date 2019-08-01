@@ -72,6 +72,12 @@ def test_slicepattern_1():
     bad_values = ['qt', dict, dict()]
     assert_raises_many(TypeError, [(f, (val,), {}) for val in bad_values])
 
+    f = match()[3]('three')
+    with pytest.raises(ValueError):
+        f(4)
+    with pytest.raises(TypeError):
+        f(4,5)
+
 
 def test_retcall():
     """ Test the retcall functionality """
@@ -273,94 +279,23 @@ def test_pattern_matches():
 
 ## Silly tests for timing and demo of capabilities
 
-@pytest.mark.skip('Recursion error, needs fixing')
 def test_patcall_complicated(benchmark):
-    """ Test the patcall functionality by implementing an integer calculator """
-    import re
+    """ Test the patcall functionality by implementing a naive Fibonacci calculator """
+    fib_match = (match()
+        [:0] (0)
+        [1]  (1)
+        [:]  (lambda n: fib_match(n-1) + fib_match(n-2)))
 
-    def not_string(x):
-        return not isinstance(x, str)
-
-    def raises(exc, message):
-        def do_raise(x):
-            raise exc(message(x) if callable(message) else message)
-        return do_raise
-
-    plus = re.compile(r'\s*\+\s*')
-    parens = re.compile(r'\(\s*(.+?)\s*\)')
-
-    doprint = False
-
-    def print_result(f):
-        i = -1
-        def _f(*args, **kwargs):
-            nonlocal i
-            i += 1
-            print('call', i, f.__name__, '_', repr(args), repr(kwargs)) if doprint else None
-            result = f(*args, **kwargs)
-            print('result', i, f.__name__, repr(result), repr(args), repr(kwargs)) if doprint else None
-            return result
-        return _f
-
-    @print_result
-    def process_parens_match(m):
-        print(m)
-        return str(intaddexpr(m[1]))
-
-    @print_result
-    def process_parens(x):
-        return intaddexpr(parens.sub(process_parens_match, x))
-
-    @print_result
-    def process_plus(x):
-        return intaddexpr(str(sum(map(intaddexpr, plus.split(x)))))
-
-    intaddexpr = (
-        match()
-            [not_string]            (raises(TypeError, 'Input must be a string'))
-            [str.isdigit]           (int)
-            #[parens.search]         (lambda x: parens.sub(lambda m: str(intaddexpr(m[0][1:-1])), x))
-            #[plus.search]           (lambda x: sum(map(intaddexpr, plus.split(x))))
-            #[lambda x: x[0] == '-'] (lambda x: -intaddexpr(x[1:]))
-            [process_parens]         (__matchresult__)
-            [process_plus]           (__matchresult__)
-            [lambda x: x[0] == '-']  (lambda x: -intaddexpr(x[1:]))
-            [:]                      (raises(ValueError, 'Not a valid integer: {}'.format))
-    )
-
-    assert intaddexpr('-12') == -12
-    assert intaddexpr('3 + 4') == 7
-    assert intaddexpr('-(2 + 1) + -3') == -6
-    assert intaddexpr('-( 2 + 1 ) + -3') == -6
-    assert_raises_many(TypeError, [
-        (intaddexpr, (None,), {}),
-        (intaddexpr, (1230,), {})
-    ])
-    assert_raises_many(ValueError, [
-        (intaddexpr, ('a + b',), {}),
-        (intaddexpr, ('a',), {}),
-    ])
-
-    benchmark(intaddexpr, '-( 2 + 1 ) + -3')
+    benchmark(fib_match, 10)
 
 
-@pytest.mark.skip('No point without the other test')
 def test_perf_baseline(benchmark):
     """ Equivalent imperative code performance, to see match() overhead """
-    import re
-    plus = re.compile(r'\s*\+\s*')
-    parens = re.compile(r'\(\s*(.+?)\s*\)')
-    def intaddexpr(expr):
-        if not isinstance(expr, str):
-            raise TypeError('Input must be a string')
-        if expr.isdigit():
-            return int(expr)
-        if parens.search(expr):
-            return intaddexpr(parens.sub(lambda m: str(intaddexpr(m[1])), expr))
-        if plus.search(expr):
-            return intaddexpr(str(sum(map(intaddexpr, plus.split(expr)))))
-        if expr[0] == '-':
-            return -intaddexpr(expr[1:])
-        ValueError('Not a valid integer: {}'.format)
+    def fib_py(n):
+        if n <= 0:
+            return 0
+        if n == 1:
+            return 1
+        return fib_py(n-1) + fib_py(n-2)
 
-    benchmark(intaddexpr, '-( 2 + 1 ) + -3')
+    benchmark(fib_py, 10)

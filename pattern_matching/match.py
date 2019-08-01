@@ -177,10 +177,10 @@ class match:
 
 
 class __matchresult__:
-    def __new__(self):
+    def __new__(self):  # pragma: no cover
         raise TypeError('__matchresult__ cannot be insantiated.')
 
 
 class _notcreating:
-    def __new__(self):
+    def __new__(self):  # pragma: no cover
         raise TypeError('__matchresult__ cannot be insantiated.')
