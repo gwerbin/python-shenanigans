@@ -4,7 +4,7 @@
 
 Create functions using pattern matching, a common feature of functional programming languages like ML, Haskell, et al.
 
-The `match` module contains the `match` object, which you use to define a "matching function". A matching function works like a regular function with positional-only arguments. So once a matching function has been created, you can use it like any other function.
+The `match` module contains the `match` class, which you use to define a "matching function". A matching function works like a regular function with positional-only arguments. So once a matching function has been created, you can use it like any other function.
 
 What makes a matching function special is how it's defined:
 
