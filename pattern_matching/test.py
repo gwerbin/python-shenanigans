@@ -87,6 +87,31 @@ def test_patcall():
     assert friendly_isdigit(25) == 'Not a string :('
 
 
+def test_init():
+    """ Test the match() constructor itself """
+    with pytest.raises(ValueError):
+        match(-1)
+
+    assert_raises_many(TypeError, [
+        (match, (1, False, False), {}),
+        (match, (1, False,), {'retcall': False}),
+    ])
+
+
+def test_rangepattern_impl():
+    """ Test the implementation of slice patterns """
+    assert match.check_range_pattern(slice(1,None), 1) is True
+    assert match.check_range_pattern(slice(1,None), 2) is True
+    assert match.check_range_pattern(slice(1,None), -1) is False
+    assert match.check_range_pattern(slice(None,1), 1) is True
+    assert match.check_range_pattern(slice(None,1), 2) is False
+    assert match.check_range_pattern(slice(None,1), -1) is True
+    assert match.check_range_pattern(slice(None,1), 1, include_upper=False) is False
+    with pytest.raises(NotImplementedError):
+        # result of check_range_pattern with slice(None,None,None) is "undefined behavior"
+        match().pattern_matches([slice(None,None,3)], [None])
+
+
 def test_patcall_complicated(benchmark):
     """ Test the patcall functionality by implementing an integer calculator """
     import re
@@ -137,8 +162,8 @@ def test_patcall_complicated(benchmark):
             [:]                     (raises(ValueError, 'Not a valid integer: {}'.format))
     )
 
-    #assert intaddexpr('-12') == -12
-    #assert intaddexpr('3 + 4') == 7
+    assert intaddexpr('-12') == -12
+    assert intaddexpr('3 + 4') == 7
     assert intaddexpr('-(2 + 1) + -3') == -6
     assert intaddexpr('-( 2 + 1 ) + -3') == -6
     assert_raises_many(TypeError, [
@@ -172,28 +197,3 @@ def test_perf_baseline(benchmark):
         ValueError('Not a valid integer: {}'.format)
 
     benchmark(intaddexpr, '-( 2 + 1 ) + -3')
-
-
-def test_init():
-    """ Test the match() constructor itself """
-    with pytest.raises(ValueError):
-        match(-1)
-
-    assert_raises_many(TypeError, [
-        (match, (1, False, False), {}),
-        (match, (1, False,), {'retcall': False}),
-    ])
-
-
-def test_rangepattern_impl():
-    """ Test the implementation of slice patterns """
-    assert match.check_range_pattern(slice(1,None), 1) is True
-    assert match.check_range_pattern(slice(1,None), 2) is True
-    assert match.check_range_pattern(slice(1,None), -1) is False
-    assert match.check_range_pattern(slice(None,1), 1) is True
-    assert match.check_range_pattern(slice(None,1), 2) is False
-    assert match.check_range_pattern(slice(None,1), -1) is True
-    assert match.check_range_pattern(slice(None,1), 1, include_upper=False) is False
-    with pytest.raises(NotImplementedError):
-        # result of check_range_pattern with slice(None,None,None) is "undefined behavior"
-        match().pattern_matches([slice(None,None,3)], [None])
