@@ -38,7 +38,7 @@ class match:
     def __call__(self, *values):
         if self.creating_pattern is not None:
             if len(values) != 1:
-                raise ValueError("Pattern must only return one value")
+                raise TypeError("Pattern must only return one value")
 
             self.patterns.append(
                 (self.creating_pattern, values[0])
@@ -48,7 +48,7 @@ class match:
             return self
 
         if len(values) != self.amount:
-            raise ValueError("Invalid amount of values for match")
+            raise TypeError("Invalid amount of values for match")
 
         for pattern, result in self.patterns:
             if self.pattern_matches(pattern, values):
