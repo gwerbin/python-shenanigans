@@ -9,7 +9,7 @@ class match:
 
     Supports the following result types:
       * Callable
-      * Literal
+      * Literal, with limitations
 
     Parameters:
       * amount: int
@@ -21,6 +21,8 @@ class match:
 
     Limitations:
       * Literal patterns cannot be slice objects or subtypes thereof.
+      * Literal patterns cannot be callable objects unless patcall=False.
+      * Results cannot be callable objects unless retcall=False.
     """
     def __init__(self, amount: int = 1, *, patcall: bool = True, retcall: bool = True):
         self.amount = amount
