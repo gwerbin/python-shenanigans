@@ -87,7 +87,7 @@ def test_patcall():
     assert friendly_isdigit(25) == 'Not a string :('
 
 
-def test_patcall_complicated():
+def test_patcall_complicated(benchmark):
     """ Test the patcall functionality by implementing an integer calculator """
     import re
 
@@ -100,18 +100,47 @@ def test_patcall_complicated():
         return do_raise
 
     plus = re.compile(r'\s*\+\s*')
+    parens = re.compile(r'\(\s*(.+?)\s*\)')
+
+    #def print_result(f):
+    #    i = 0 
+    #    def _f(*args, **kwargs):
+    #        result = f(*args, **kwargs)
+    #        nonlocal i
+    #        i += 1
+    #        print(i, f.__name__, repr(result), repr(args), repr(kwargs))
+    #        return result
+    #    return _f
+
+    #@print_results
+    def process_parens(x):
+        return intaddexpr(parens.sub(lambda m: str(intaddexpr(m[1])), x))
+
+    #@print_results
+    def process_plus(x):
+        return intaddexpr(str(sum(map(intaddexpr, plus.split(x)))))
+
+    #@print_results
+    def process_minus(x):
+        return -intaddexpr(x[1:])
 
     intaddexpr = (
         match()
             [not_string]            (raises(TypeError, 'Input must be a string'))
             [str.isdigit]           (int)
-            [lambda x: x[0] == '-'] (lambda x: -intaddexpr(x[1:]))
-            [plus.search]           (lambda x: sum(map(intaddexpr, plus.split(x))))
+            #[parens.search]         (lambda x: parens.sub(lambda m: str(intaddexpr(m[0][1:-1])), x))
+            #[plus.search]           (lambda x: sum(map(intaddexpr, plus.split(x))))
+            #[lambda x: x[0] == '-'] (lambda x: -intaddexpr(x[1:]))
+            [parens.search]         (process_parens)
+            [plus.search]           (process_plus)
+            [lambda x: x[0] == '-'] (process_minus)
             [:]                     (raises(ValueError, 'Not a valid integer: {}'.format))
     )
 
-    assert intaddexpr('-12') == -12
-    assert intaddexpr('3 + 4') == 7
+    #assert intaddexpr('-12') == -12
+    #assert intaddexpr('3 + 4') == 7
+    assert intaddexpr('-(2 + 1) + -3') == -6
+    assert intaddexpr('-( 2 + 1 ) + -3') == -6
     assert_raises_many(TypeError, [
         (intaddexpr, (None,), {}),
         (intaddexpr, (1230,), {})
@@ -120,6 +149,29 @@ def test_patcall_complicated():
         (intaddexpr, ('a + b',), {}),
         (intaddexpr, ('a',), {}),
     ])
+
+    benchmark(intaddexpr, '-( 2 + 1 ) + -3')
+
+
+def test_perf_baseline(benchmark):
+    """ Equivalent imperative code performance, to see match() overhead """
+    import re
+    plus = re.compile(r'\s*\+\s*')
+    parens = re.compile(r'\(\s*(.+?)\s*\)')
+    def intaddexpr(expr):
+        if not isinstance(expr, str):
+            raise TypeError('Input must be a string')
+        if expr.isdigit():
+            return int(expr)
+        if parens.search(expr):
+            return intaddexpr(parens.sub(lambda m: str(intaddexpr(m[1])), expr))
+        if plus.search(expr):
+            return intaddexpr(str(sum(map(intaddexpr, plus.split(expr)))))
+        if expr[0] == '-':
+            return -intaddexpr(expr[1:])
+        ValueError('Not a valid integer: {}'.format)
+
+    benchmark(intaddexpr, '-( 2 + 1 ) + -3')
 
 
 def test_init():
@@ -134,6 +186,7 @@ def test_init():
 
 
 def test_rangepattern_impl():
+    """ Test the implementation of slice patterns """
     assert match.check_range_pattern(slice(1,None), 1) is True
     assert match.check_range_pattern(slice(1,None), 2) is True
     assert match.check_range_pattern(slice(1,None), -1) is False
@@ -142,4 +195,5 @@ def test_rangepattern_impl():
     assert match.check_range_pattern(slice(None,1), -1) is True
     assert match.check_range_pattern(slice(None,1), 1, include_upper=False) is False
     with pytest.raises(NotImplementedError):
+        # result of check_range_pattern with slice(None,None,None) is "undefined behavior"
         match().pattern_matches([slice(None,None,3)], [None])
