@@ -33,6 +33,12 @@ def is_mom_2(name):
 
 The `match` version emphasizes the relationships between pieces of data, while the plain-Python versions put greater emphasis on the procedure of checking for and returning data.
 
+## Installation
+
+```bash
+pip install 'git+https://github.com/kingdom5500/python-shenanigans#egg=pattern-matching&subdirectory=pattern_matching'
+```
+
 ## Example
 
 ```python
