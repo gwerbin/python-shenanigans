@@ -1,4 +1,20 @@
 class match:
+    """ Create a pattern-matching function
+    
+    Supports the following pattern types:
+      * Placeholder (:)
+      * Literal, with limitations
+
+    Supports the following result types:
+      * Literal
+
+    Parameters:
+      * amount: int
+          Number of arguments to match on
+
+    Limitations:
+      * Literal patterns cannot be slice objects or subtypes thereof.
+    """
 
     def __init__(self, *, amount=1):
         self.amount = amount
